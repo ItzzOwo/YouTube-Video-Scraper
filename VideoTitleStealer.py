@@ -1,23 +1,12 @@
 #to get a channel id, use this site: https://commentpicker.com/youtube-channel-id.php
 #you will have to replace the API key with your own at https://developers.google.com/youtube/v3
 #if you encounter any problems, join my discord: https://discord.gg/WW5PuDBySt
-#i would recommend NOT using the synonyms
-
 
 import requests
 import html
-import nltk
-from nltk.corpus import wordnet
-import random
+import openai
 
-def get_synonyms(word):
-    synonyms = set()
-    for syn in wordnet.synsets(word):
-        for lemma in syn.lemmas():
-            synonyms.add(lemma.name())
-    return list(synonyms)
-
-def get_video_titles(api_key, channel_id, max_results=500): #change number of videos here
+def get_video_titles(api_key, channel_id, max_results=500): #change max results here if you want more or less videos
     try:
         base_url = "https://www.googleapis.com/youtube/v3/search"
         titles = []
@@ -49,42 +38,54 @@ def get_video_titles(api_key, channel_id, max_results=500): #change number of vi
         print("An error occurred:", e)
         return []
 
-def rewrite_video_titles(titles):
-    nltk.download("wordnet")
-    rewritten_titles = []
+def rewrite_titles(titles):
+    try:
+        openai.api_key = "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"  #replace api key with openai api key
+        response = openai.Completion.create(
+            engine="text-davinci-002",
+            prompt="\n".join(titles),
+            temperature=0.7,
+            max_tokens=200,
+            n=1,
+        )
 
-    for title in titles:
-        words = title.split()
-        new_title = []
-        for word in words:
-            synonyms = get_synonyms(word)
-            if synonyms:
-                new_word = random.choice(synonyms)
-            else:
-                new_word = word
-            new_title.append(new_word)
-        rewritten_titles.append(" ".join(new_title))
-
-    return rewritten_titles
+        rewritten_titles = response['choices'][0]['text'].strip().split("\n")
+        return rewritten_titles
+    except Exception as e:
+        print("An error occurred while rewriting titles:", e)
+        return []
 
 def scrape_youtube_titles(channel_id):
     try:
-        api_key = "PUT API HERE" #replace api key with youtube api key here https://developers.google.com/youtube/v3
+        api_key = "youtube"  #replace with youtube dev api key at https://developers.google.com/youtube/v3
+        openai.api_key = "openai"  #replace with openai api key
+
         titles = get_video_titles(api_key, channel_id)
-
-        print(f"Scraped {len(titles)} video titles.")
-
-        rewrite_choice = input("Do you want to rewrite the video titles with synonyms? (not recommended) (y/n): ")
-        if rewrite_choice.lower() == "y":
-            rewritten_titles = rewrite_video_titles(titles)
-            titles = rewritten_titles
-
         titles = [html.unescape(title) for title in titles]
-        with open("video_titles.txt", "w", encoding="utf-8") as file:
-            for title in titles:
-                file.write(title + "\n")
 
-        print(f"Successfully saved {'rewritten ' if rewrite_choice.lower() == 'y' else ''}{len(titles)} video titles to 'video_titles.txt'")
+        create_unique_sentences = input("Would you like to rewrite the titles? (yes/no): ").lower().strip()
+        if create_unique_sentences == "yes":
+            rewritten_titles = rewrite_titles(titles)
+            if rewritten_titles:
+                save_options = input("Do you want to save the original titles, rewritten titles, or both? (original/rewritten/both): ").lower().strip()
+                if save_options in ['original', 'both']:
+                    with open("video_titles.txt", "w", encoding="utf-8") as file:
+                        for title in titles:
+                            file.write(title + "\n")
+                    print(f"Successfully scraped and saved {len(titles)} original video titles to 'video_titles.txt'")
+
+                if save_options in ['rewritten', 'both']:
+                    with open("rewritten_video_titles.txt", "w", encoding="utf-8") as file:
+                        for title in rewritten_titles:
+                            file.write(title + "\n")
+                    print(f"Successfully rewrote {len(rewritten_titles)} video titles and saved them to 'rewritten_video_titles.txt'")
+            else:
+                print("Failed to rewrite titles using the ChatGPT API.")
+        else:
+            with open("video_titles.txt", "w", encoding="utf-8") as file:
+                for title in titles:
+                    file.write(title + "\n")
+            print(f"Successfully scraped {len(titles)} video titles and saved them to 'video_titles.txt'")
     except Exception as e:
         print("An error occurred:", e)
 
