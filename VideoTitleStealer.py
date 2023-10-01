@@ -40,7 +40,7 @@ def get_video_titles(api_key, channel_id, max_results=500): #change max results 
 
 def rewrite_titles(titles):
     try:
-        openai.api_key = "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"  #replace api key with openai api key
+        openai.api_key = ""  #replace api key with openai api key
         response = openai.Completion.create(
             engine="text-davinci-002",
             prompt="\n".join(titles),
